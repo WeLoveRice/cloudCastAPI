@@ -28,7 +28,7 @@ def noaa_url_list():
     file_list = pattern.findall(res.text)
     file_list = list(set(file_list))
     url_list = [f'{url}{file_name}' for file_name in file_list]
-    return url_list[1:5]
+    return url_list[0:5]
 
 
 def download_cloudcast(url: str):
@@ -77,6 +77,21 @@ def update_local_files(url_list):
     results = ThreadPool(100).imap_unordered(download_cloudcast, url_list)
     for r in results:
         print(r)
+
+    var_list = [
+        ':TCDC:entire atmosphere',
+        ':TMP:2 m ',
+        ':RH:2 m ',
+        ':APTMP:2 m ',
+        ':UGRD:10 m ',
+        ':VGRD:10 m '
+    ]
+
+    for var in var_list:
+        var_str = var.replace(':', '_').replace(' ', '_')
+        os.system(f"cat ./noaa_model/*.{var_str} >> ./noaa_model/gfs.pgrb2.0p25.{var_str}")
+
+    os.system('rm -r ./noaa_model/gfs.t*')
     
 
 def update_model_loop():

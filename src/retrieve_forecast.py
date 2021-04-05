@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 from dask import compute, delayed
 from math import floor
-import cfgrib
-# cfgrib.open_datasets('noaa_model/gfs.t12z.pgrb2.0p25.f020')
+
 
 def load_datasets_from_model() -> xr.Dataset:
     var_list = [
@@ -35,18 +34,17 @@ def load_datasets_from_model() -> xr.Dataset:
 
 def forecast_at_location(ds_list_model, latitude, longitude): 
     delayed_ds_location_list = []
-
     for ds_model in ds_list_model:
-        ds_location = delayed(ds_model.sel)(longitude=longitude, latitude=latitude, method="nearest")
+        ds_location = ds_model.values([ds_model.longitude == longitude])
+        ds_location = ds_location.values([ds_model.latitude == latitude])
+        # ds_location = delayed(ds_model.sel)(longitude=longitude, latitude=latitude, method="nearest")
         delayed_ds_location_list.append(ds_location)
-    
     ds_location_list = compute(*delayed_ds_location_list)
-
-    df_location_list = []
+    delayed_df_location_list = []
     for ds_location in ds_location_list:
-        df_location = ds_location.to_dataframe()
-        df_location_list.append(df_location)
-    
+        df_location = delayed(ds_location.to_dataframe())
+        delayed_df_location_list.append(df_location)
+    df_location_list = compute(*delayed_df_location_list)
     df_forecast = pd.concat(df_location_list, axis=1).T.drop_duplicates().T
     df_forecast = df_forecast[['valid_time', 'tcc', 't2m', 'aptmp', 'r2', 'u10', 'v10']]
     df_forecast['wind_speed'] = [np.sqrt(np.square(df_forecast['u10'][i])+np.square(df_forecast['v10'][i])) for i in range(0, len(df_forecast['u10']))]
@@ -58,11 +56,8 @@ def forecast_at_location(ds_list_model, latitude, longitude):
     df_forecast = df_forecast.reset_index(drop=True)
     cols = ['total_cloud_cover', 'temp', 'temp_feels_like', 'relative_humidity', 'wind_speed']
     df_forecast[cols] = df_forecast[cols].apply(pd.to_numeric)
-    print(df_forecast)
     df_forecast[cols] = df_forecast[cols].round(2)
-    print(df_forecast)
     forecast_json = df_forecast.to_json(orient='records')
-
     forecast_json = {
         'type': 'Feature',
         'geometry': {
