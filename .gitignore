@@ -2,3 +2,6 @@
 /shelf/
 /workspace.xml
 /.idea/
+model
+/env/
+/__pycache__/
